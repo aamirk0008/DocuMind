@@ -1,7 +1,8 @@
 import Redis from 'ioredis';
 
 const redis = new Redis(process.env.REDIS_URL, {
-  tls: { rejectUnauthorized: false }
+  tls: { rejectUnauthorized: false },
+  maxRetriesPerRequest: null,
 });
 
 redis.on('connect', () => console.log('Redis connected'));

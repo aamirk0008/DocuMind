@@ -1,72 +1,90 @@
-import fs from "fs";
-import { PDFLoader } from "@langchain/community/document_loaders/fs/pdf";
-import { RecursiveCharacterTextSplitter } from "@langchain/textsplitters";
-import { MongoDBAtlasVectorSearch } from "@langchain/mongodb";
-import mongoose from "mongoose";
-import { getEmbeddings } from "../config/gemini.js";
-import Document from "../models/Document.js";
+import fs from 'fs';
+import { getDocument } from 'pdfjs-dist/legacy/build/pdf.mjs';
+import { RecursiveCharacterTextSplitter } from '@langchain/textsplitters';
+import { Document } from '@langchain/core/documents';
+import mongoose from 'mongoose';
+import { getEmbeddings } from '../config/gemini.js';
+import DocumentModel from '../models/Document.js';
 
+const extractTextFromPDF = async (filePath) => {
+    const data = new Uint8Array(fs.readFileSync(filePath));
+    const pdf = await getDocument({ data }).promise;
+    let fullText = '';
+
+    for (let i = 1; i <= pdf.numPages; i++) {
+        const page = await pdf.getPage(i);
+        const content = await page.getTextContent();
+        const pageText = content.items.map(item => item.str).join(' ');
+        fullText += `\n${pageText}`;
+    }
+
+    return { text: fullText, numPages: pdf.numPages };
+};
 
 export const ingestDocument = async (documentId, filePath) => {
     try {
-        // Mark as processing
-        await Document.findByIdAndUpdate(documentId, { status: 'processing' })
+        await DocumentModel.findByIdAndUpdate(documentId, { status: 'processing' });
 
-        // Load PDF
-        const loader = new PDFLoader(filePath)
-        const rawDocs = await loader.load()
+        const { text, numPages } = await extractTextFromPDF(filePath);
+        if (!text?.trim()) throw new Error('Could not extract text from PDF');
+        console.log(`Extracted ${numPages} pages from PDF`);
 
-        if (!rawDocs.length) throw new Error('Could not extract text from PDF')
-
-        // Split it into chunks 
         const splitter = new RecursiveCharacterTextSplitter({
             chunkSize: 1000,
             chunkOverlap: 200,
-        })
-        const chunks = await splitter.splitDocuments(rawDocs)
+        });
 
-        // Add metadata to each chunk
-        const enrichedChunks = chunks.map((chunk, index) => ({
-            ...chunk,
+        const rawChunks = await splitter.splitText(text);
+
+        const chunks = rawChunks.map((chunkText, index) => new Document({
+            pageContent: chunkText,
             metadata: {
-                ...chunk.metadata,
                 documentId: documentId.toString(),
                 chunkIndex: index,
-                pageNumber: chunk.metadata?.loc?.pageNumber || chunk.metadata?.page || 1,
+                totalChunks: rawChunks.length,
+                originalPages: numPages,
             },
         }));
 
-        // Store embeddings in MongoDB Atlas Vector Search
-        const embeddings = getEmbeddings('retrieval_document')
-        const collection = mongoose.connection.db.collection('chunks')
+        console.log(`Split into ${chunks.length} chunks, generating embeddings...`);
 
-        await MongoDBAtlasVectorSearch.fromDocuments(
-            enrichedChunks,
-            embeddings,
-            {
-                collection,
-                indexName: 'vector_index',
-                textKey: 'pageContent',
-                embeddingKey: 'embedding'
-            }
-        )
+        // Generate embeddings and insert directly into MongoDB
+        const embeddings = getEmbeddings('RETRIEVAL_DOCUMENT');
+        const collection = mongoose.connection.db.collection('chunks');
 
-        // MArk as ready
-        await Document.findByIdAndUpdate(documentId, {
+        const texts = chunks.map(c => c.pageContent);
+        const vectors = await embeddings.embedDocuments(texts);
+        console.log('First vector length:', vectors[0]?.length);
+        console.log('First vector sample:', vectors[0]?.slice(0, 3));
+        console.log(`Generated ${vectors.length} embedding vectors`);
+
+        const docsToInsert = chunks.map((chunk, i) => ({
+            pageContent: chunk.pageContent,
+            embedding: vectors[i],
+            metadata: chunk.metadata,
+        }));
+
+        const result = await collection.insertMany(docsToInsert);
+        console.log(`Inserted ${result.insertedCount} chunks into Atlas`);
+
+        await DocumentModel.findByIdAndUpdate(documentId, {
             status: 'ready',
             chunkCount: chunks.length,
-        })
+        });
 
-        // Clean up uploaded file
-        fs.unlinkSync(filePath)
-        console.log(`Document ${documentId} ingested: ${chunks.length} chunks`)
+        fs.unlinkSync(filePath);
+        console.log(`Document ${documentId} ingested: ${chunks.length} chunks`);
 
-    } catch (error) {
-        console.error('Ingestion error:', error.message)
-        await Document.findByIdAndUpdate(documentId, {
+        // Test single embedding first
+        const testVec = await embeddings.embedQuery('test');
+        console.log('Test embedding length:', testVec.length);
+    } catch (err) {
+        console.error('Ingestion error:', err.message);
+        console.error('Stack:', err.stack);
+        await DocumentModel.findByIdAndUpdate(documentId, {
             status: 'failed',
-            errorMessage: error.message,
-        })
-        throw error
+            errorMessage: err.message,
+        });
+        throw err;
     }
-}
+};
