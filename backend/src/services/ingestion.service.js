@@ -54,8 +54,6 @@ export const ingestDocument = async (documentId, filePath) => {
 
         const texts = chunks.map(c => c.pageContent);
         const vectors = await embeddings.embedDocuments(texts);
-        console.log('First vector length:', vectors[0]?.length);
-        console.log('First vector sample:', vectors[0]?.slice(0, 3));
         console.log(`Generated ${vectors.length} embedding vectors`);
 
         const docsToInsert = chunks.map((chunk, i) => ({
@@ -75,9 +73,6 @@ export const ingestDocument = async (documentId, filePath) => {
         fs.unlinkSync(filePath);
         console.log(`Document ${documentId} ingested: ${chunks.length} chunks`);
 
-        // Test single embedding first
-        const testVec = await embeddings.embedQuery('test');
-        console.log('Test embedding length:', testVec.length);
     } catch (err) {
         console.error('Ingestion error:', err.message);
         console.error('Stack:', err.stack);
