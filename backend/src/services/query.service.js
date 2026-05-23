@@ -4,12 +4,8 @@ import { HumanMessage, SystemMessage } from '@langchain/core/messages';
 
 export const queryDocument = async (question, documentId) => {
   const embeddings = getEmbeddings('RETRIEVAL_QUERY');
-
-  // Embed the question
   const questionVector = await embeddings.embedQuery(question);
-  console.log('Question vector length:', questionVector.length);
 
-  // Vector search
   const collection = mongoose.connection.db.collection('chunks');
   const results = await collection.aggregate([
     {
@@ -18,10 +14,13 @@ export const queryDocument = async (question, documentId) => {
         path: 'embedding',
         queryVector: questionVector,
         numCandidates: 50,
-        limit: 5,
-        filter: { 'metadata.documentId': documentId.toString() },
+        limit: 20,
       },
     },
+    {
+      $match: { 'metadata.documentId': documentId.toString() },
+    },
+    { $limit: 5 },
     {
       $project: {
         pageContent: 1,
@@ -30,8 +29,6 @@ export const queryDocument = async (question, documentId) => {
       },
     },
   ]).toArray();
-
-  console.log(`Vector search returned ${results.length} chunks`);
 
   if (!results.length) {
     return {
@@ -52,10 +49,7 @@ Rules:
 - Always cite which source(s) you used (e.g. "According to Source 1...")
 - Be concise and accurate`;
 
-  const userPrompt = `Context from document:
-${context}
-
-Question: ${question}`;
+  const userPrompt = `Context from document:\n${context}\n\nQuestion: ${question}`;
 
   const response = await llm.invoke([
     new SystemMessage(systemPrompt),
@@ -68,8 +62,5 @@ Question: ${question}`;
     score: Math.round(r.score * 100) / 100,
   }));
 
-  return {
-    answer: response.content,
-    sources,
-  };
+  return { answer: response.content, sources };
 };

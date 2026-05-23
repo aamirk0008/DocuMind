@@ -11,20 +11,19 @@ const COOKIE_OPTS = {
 export const register = async (req, res) => {
   try {
     const { name, email, password } = req.body;
-    if (!name || !email || !password)
-      return res.status(400).json({ message: 'All fields required' });
-
     const exists = await User.findOne({ email });
     if (exists) return res.status(409).json({ message: 'Email already in use' });
 
     const user = await User.create({ name, email, password });
     const { accessToken, refreshToken } = issueTokens(user._id.toString());
-
     user.refreshTokens.push(refreshToken);
     await user.save();
 
     res.cookie('refreshToken', refreshToken, COOKIE_OPTS);
-    res.status(201).json({ accessToken, user: { id: user._id, name: user.name, email: user.email } });
+    res.status(201).json({
+      accessToken,
+      user: { id: user._id, name: user.name, email: user.email },
+    });
   } catch (err) {
     res.status(500).json({ message: err.message });
   }
@@ -44,7 +43,6 @@ export const login = async (req, res) => {
     res.cookie('refreshToken', refreshToken, COOKIE_OPTS);
     res.json({ accessToken, user: { id: user._id, name: user.name, email: user.email } });
   } catch (err) {
-    console.error('REGISTER ERROR:', err);
     res.status(500).json({ message: err.message });
   }
 };
@@ -59,7 +57,6 @@ export const refresh = async (req, res) => {
     if (!user || !user.refreshTokens.includes(token))
       return res.status(403).json({ message: 'Refresh token reuse detected' });
 
-    // Rotate: remove old, issue new
     user.refreshTokens = user.refreshTokens.filter(t => t !== token);
     const { accessToken, refreshToken: newRefresh } = issueTokens(user._id.toString());
     user.refreshTokens.push(newRefresh);
