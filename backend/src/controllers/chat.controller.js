@@ -1,5 +1,5 @@
 import mongoose from 'mongoose';
-import ChatSession from "../models/ChatSession.js";
+import ChatSession from '../models/ChatSession.js';
 import Document from '../models/Document.js';
 import { queryDocument } from '../services/query.service.js';
 
@@ -7,9 +7,6 @@ export const askQuestion = async (req, res) => {
   try {
     const { question } = req.body;
     const { documentId } = req.params;
-
-    if (!question?.trim())
-      return res.status(400).json({ message: 'Question is required' });
 
     const doc = await Document.findOne({
       _id: new mongoose.Types.ObjectId(documentId),
@@ -44,22 +41,17 @@ export const askQuestion = async (req, res) => {
 };
 
 export const getChatHistory = async (req, res) => {
-    try {
-        const { documentId } = req.params;
+  try {
+    const { documentId } = req.params;
+    const doc = await Document.findOne({ _id: documentId, userId: req.userId });
+    if (!doc) return res.status(404).json({ message: 'Document not found' });
 
-        const doc = await Document.findOne({ _id: documentId, userId: req.userId });
-        if (!doc) return res.status(404).json({ message: 'Document not found' });
-
-        const session = await ChatSession.findOne({
-            userId: req.userId,
-            documentId,
-        });
-
-        res.json({
-            messages: session?.messages || [],
-            documentName: doc.originalName,
-        });
-    } catch (err) {
-        res.status(500).json({ message: err.message });
-    }
+    const session = await ChatSession.findOne({ userId: req.userId, documentId });
+    res.json({
+      messages: session?.messages || [],
+      documentName: doc.originalName,
+    });
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
 };
