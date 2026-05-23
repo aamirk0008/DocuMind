@@ -1,0 +1,17 @@
+import { cn } from '../../lib/utils';
+
+export function Card({ className, children, ...props }) {
+  return (
+    <div className={cn('rounded-xl border border-border bg-card p-6 shadow-sm', className)} {...props}>
+      {children}
+    </div>
+  );
+}
+
+export function CardHeader({ className, children }) {
+  return <div className={cn('mb-4', className)}>{children}</div>;
+}
+
+export function CardTitle({ className, children }) {
+  return <h2 className={cn('text-lg font-semibold text-card-foreground', className)}>{children}</h2>;
+}
