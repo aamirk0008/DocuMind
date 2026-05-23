@@ -1,20 +1,36 @@
-import { useState } from 'react'
-import reactLogo from './assets/react.svg'
-import viteLogo from './assets/vite.svg'
-import heroImg from './assets/hero.png'
+import { useEffect } from 'react';
+import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import useAuthStore from './store/authStore';
+import useThemeStore from './store/themeStore';
+import AuthPage from './pages/AuthPage';
+import DashboardPage from './pages/DashboardPage';
+import ChatPage from './pages/ChatPage';
 
-function App() {
-  const [count, setCount] = useState(0)
+const qc = new QueryClient({
+  defaultOptions: { queries: { retry: 1, staleTime: 30_000 } },
+});
+
+const PrivateRoute = ({ children }) => {
+  const user = useAuthStore(s => s.user);
+  return user ? children : <Navigate to="/auth" replace />;
+};
+
+export default function App() {
+  const init = useThemeStore(s => s.init);
+
+  useEffect(() => { init(); }, []);
 
   return (
-    <>
-      <h1 className="text-4xl font-bold text-center mt-10">Welcome to DocuMind</h1>
-      <p className="text-center mt-4 text-lg">Your AI-powered document assistant</p>
-      <div className="flex justify-center mt-10">
-        <img src={heroImg} alt="DocuMind Hero" className="w-full max-w-2xl rounded-lg shadow-lg" />
-      </div>
-    </>
-  )
+    <QueryClientProvider client={qc}>
+      <BrowserRouter>
+        <Routes>
+          <Route path="/auth" element={<AuthPage />} />
+          <Route path="/" element={<PrivateRoute><DashboardPage /></PrivateRoute>} />
+          <Route path="/chat/:documentId" element={<PrivateRoute><ChatPage /></PrivateRoute>} />
+          <Route path="*" element={<Navigate to="/" replace />} />
+        </Routes>
+      </BrowserRouter>
+    </QueryClientProvider>
+  );
 }
-
-export default App

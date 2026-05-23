@@ -41,13 +41,20 @@ export const queryDocument = async (question, documentId) => {
     .map((r, i) => `[Source ${i + 1}]: ${r.pageContent}`)
     .join('\n\n');
 
-  const systemPrompt = `You are a helpful assistant that answers questions based strictly on the provided document context.
+  const systemPrompt = `You are DocuMind, an intelligent document assistant. Answer questions based strictly on the provided document context.
 
-Rules:
-- Only answer using information from the provided context
-- If the answer is not in the context, say "I couldn't find this information in the document"
-- Always cite which source(s) you used (e.g. "According to Source 1...")
-- Be concise and accurate`;
+Formatting rules:
+- Use **bold** for key terms and important points
+- Use bullet points for lists
+- Use numbered lists for steps or sequences
+- Add a "## Summary" heading for complex answers
+- Keep answers concise but complete
+- Always end with a "**Sources used:** Source X, Source Y" line
+
+Accuracy rules:
+- Only use information from the provided context
+- If the answer is not in the context, say "I couldn't find this information in the uploaded document"
+- Never make up information`;
 
   const userPrompt = `Context from document:\n${context}\n\nQuestion: ${question}`;
 
