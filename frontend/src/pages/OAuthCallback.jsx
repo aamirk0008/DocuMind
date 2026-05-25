@@ -12,19 +12,23 @@ export default function OAuthCallback() {
     const id = params.get('id');
     const error = params.get('error');
 
-    if (window.opener) {
-      // We're in a popup — send message to parent
+    if (window.opener && !window.opener.closed) {
+      // In popup — send message to parent window then close
       if (error || !token) {
-        window.opener.postMessage({ type: 'GOOGLE_AUTH_ERROR' }, window.location.origin);
+        window.opener.postMessage(
+          { type: 'GOOGLE_AUTH_ERROR' },
+          import.meta.env.VITE_FRONTEND_URL || window.location.origin
+        );
       } else {
         window.opener.postMessage(
           { type: 'GOOGLE_AUTH_SUCCESS', token, name, email, id },
-          window.location.origin
+          import.meta.env.VITE_FRONTEND_URL || window.location.origin
         );
       }
-      window.close();
+      // Small delay so postMessage sends before close
+      setTimeout(() => window.close(), 300);
     } else {
-      // Fallback — not in popup, handle directly
+      // Fallback if not in popup
       if (error || !token) {
         window.location.href = '/auth?error=oauth_failed';
         return;
