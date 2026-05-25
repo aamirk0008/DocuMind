@@ -40,7 +40,7 @@ const Message = ({ msg }) => {
         <div className={`px-4 py-3 rounded-2xl text-sm leading-relaxed
           ${isUser
             ? 'bg-primary text-primary-foreground rounded-tr-sm'
-            : 'bg-card border border-border text-foreground rounded-tl-sm prose prose-sm dark:prose-invert max-w-none'}`}>
+            : 'bg-card border border-border text-foreground rounded-tl-sm prose-custom'}`}>
           {isUser ? msg.content : <ReactMarkdown>{msg.content}</ReactMarkdown>}
         </div>
         {msg.sources?.length > 0 && (

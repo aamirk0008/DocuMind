@@ -71,3 +71,16 @@
     @apply bg-background text-foreground font-sans antialiased;
   }
 }
+
+@layer utilities {
+  .prose-custom p { margin-bottom: 0.75rem; line-height: 1.7; }
+  .prose-custom p:last-child { margin-bottom: 0; }
+  .prose-custom ul { list-style-type: disc; padding-left: 1.25rem; margin-bottom: 0.75rem; }
+  .prose-custom ol { list-style-type: decimal; padding-left: 1.25rem; margin-bottom: 0.75rem; }
+  .prose-custom li { margin-bottom: 0.25rem; }
+  .prose-custom strong { font-weight: 600; }
+  .prose-custom h2 { font-size: 0.95rem; font-weight: 600; margin-top: 1rem; margin-bottom: 0.5rem; }
+  .prose-custom h3 { font-size: 0.875rem; font-weight: 600; margin-top: 0.75rem; margin-bottom: 0.25rem; }
+  .prose-custom code { background-color: hsl(var(--muted)); padding: 0.125rem 0.375rem; border-radius: 0.25rem; font-size: 0.75rem; font-family: 'JetBrains Mono', monospace; }
+  .prose-custom blockquote { border-left: 3px solid hsl(var(--border)); padding-left: 0.75rem; color: hsl(var(--muted-foreground)); margin: 0.5rem 0; }
+}
