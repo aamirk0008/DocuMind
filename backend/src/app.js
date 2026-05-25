@@ -2,6 +2,7 @@ import express from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
 import cookieParser from 'cookie-parser';
+import './config/passport.js'
 import passport from 'passport';
 import authRoutes from './routes/auth.routes.js';
 import documentRoutes from './routes/document.routes.js';
