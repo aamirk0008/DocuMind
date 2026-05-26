@@ -26,7 +26,7 @@ const useAuthStore = create(
         try { await api.post('/auth/logout'); } catch {}
         localStorage.removeItem('accessToken');
         set({ user: null, accessToken: null });
-        window.location.href = '/auth';
+        window.location.href = '/';
       },
     }),
     { name: 'auth-storage', partialize: (s) => ({ user: s.user }) }

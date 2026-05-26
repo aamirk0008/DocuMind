@@ -7,6 +7,7 @@ import AuthPage from './pages/AuthPage';
 import DashboardPage from './pages/DashboardPage';
 import ChatPage from './pages/ChatPage';
 import OAuthCallback from './pages/OAuthCallback';
+import HomePage from './pages/HomePage';
 
 const qc = new QueryClient({
   defaultOptions: { queries: { retry: 1, staleTime: 30_000 } },
@@ -26,10 +27,11 @@ export default function App() {
     <QueryClientProvider client={qc}>
       <BrowserRouter>
         <Routes>
+          <Route path='/' element={<HomePage/>} />
           <Route path="/auth" element={<AuthPage />} />
-          <Route path="/" element={<PrivateRoute><DashboardPage /></PrivateRoute>} />
-          <Route path="/chat/:documentId" element={<PrivateRoute><ChatPage /></PrivateRoute>} />
           <Route path="/auth/callback" element={<OAuthCallback />} />
+          <Route path="/dashboard" element={<PrivateRoute><DashboardPage /></PrivateRoute>} />
+          <Route path="/chat/:documentId" element={<PrivateRoute><ChatPage /></PrivateRoute>} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </BrowserRouter>
