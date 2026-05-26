@@ -12,7 +12,7 @@ export default function Navbar() {
       <div className="flex items-center gap-2">
         {/* <FileText className="h-5 w-5 text-primary" />
         <span className="font-semibold text-foreground">DocuMind</span> */}
-        <img src="https://res.cloudinary.com/datflmfl4/image/upload/v1779567136/ChatGPT_Image_May_24_2026_01_41_54_AM_wrbeql.png" alt="DocuMind logo" className="w-52 h-34" />
+        <img src="https://res.cloudinary.com/datflmfl4/image/upload/v1779815819/ChatGPT_Image_May_24_2026_01_41_54_AM_l5u7dl.png" alt="DocuMind logo" className="w-30 h-10" />
       </div>
 
       <div className="flex items-center gap-3">
