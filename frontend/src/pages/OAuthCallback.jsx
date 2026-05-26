@@ -22,7 +22,7 @@ export default function OAuthCallback() {
 
     localStorage.setItem('accessToken', token);
     setUser({ id, name, email });
-    navigate('/');
+    navigate('/dashboard');
   }, []);
 
   return (
