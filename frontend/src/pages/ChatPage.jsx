@@ -1,10 +1,11 @@
 import { useState, useRef, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { ArrowLeft, Send, FileText, ChevronDown, ChevronUp, Loader2, Bot, User } from 'lucide-react';
+import { ArrowLeft, Send, FileText, ChevronDown, ChevronUp, Loader2, Bot, User, Sparkles } from 'lucide-react';
+import ReactMarkdown from 'react-markdown';
 import Navbar from '../components/layout/Navbar';
 import Button from '../components/ui/Button';
 import { useChatHistory, useAskQuestion } from '../hooks/useChat';
-import ReactMarkdown from 'react-markdown';
+import { useSuggestedQuestions } from '../hooks/useDocuments';
 
 const SourceCard = ({ source, index }) => {
   const [open, setOpen] = useState(false);
@@ -63,20 +64,26 @@ export default function ChatPage() {
   const [optimistic, setOptimistic] = useState([]);
   const bottomRef = useRef(null);
 
+  const hasMessages = (data?.messages?.length || 0) > 0;
+
+  // Only fetch suggestions if no chat history yet
+  const { data: suggestions = [], isLoading: suggestionsLoading } =
+    useSuggestedQuestions(documentId, !hasMessages);
+
   const messages = [...(data?.messages || []), ...optimistic];
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
 
-  const handleSend = async () => {
-    if (!input.trim() || ask.isPending) return;
-    const question = input.trim();
+  const handleSend = async (question) => {
+    const q = question || input.trim();
+    if (!q || ask.isPending) return;
     setInput('');
-    setOptimistic([{ role: 'user', content: question, _id: 'opt' }]);
+    setOptimistic([{ role: 'user', content: q, _id: 'opt' }]);
 
     try {
-      await ask.mutateAsync(question);
+      await ask.mutateAsync(q);
       setOptimistic([]);
     } catch {
       setOptimistic([]);
@@ -111,14 +118,47 @@ export default function ChatPage() {
               <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
             </div>
           ) : messages.length === 0 ? (
-            <div className="text-center py-16">
-              <Bot className="h-12 w-12 mx-auto text-muted-foreground mb-3" />
-              <p className="font-medium text-foreground">Start a conversation</p>
-              <p className="text-sm text-muted-foreground mt-1">Ask anything about your document</p>
+            <div className="flex flex-col items-center py-10 gap-6">
+              <div className="text-center">
+                <Bot className="h-12 w-12 mx-auto text-muted-foreground mb-3" />
+                <p className="font-medium text-foreground">Start a conversation</p>
+                <p className="text-sm text-muted-foreground mt-1">
+                  Ask anything about your document
+                </p>
+              </div>
+
+              {/* Suggested questions */}
+              {suggestionsLoading ? (
+                <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                  <Sparkles className="h-4 w-4 animate-pulse text-primary" />
+                  Generating suggested questions...
+                </div>
+              ) : suggestions.length > 0 && (
+                <div className="w-full max-w-xl">
+                  <div className="flex items-center gap-2 mb-3">
+                    <Sparkles className="h-4 w-4 text-primary" />
+                    <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
+                      Suggested questions
+                    </p>
+                  </div>
+                  <div className="flex flex-col gap-2">
+                    {suggestions.map((q, i) => (
+                      <button
+                        key={i}
+                        onClick={() => handleSend(q)}
+                        className="text-left px-4 py-3 rounded-xl border border-border bg-card hover:bg-accent hover:border-primary/30 transition-all text-sm text-foreground"
+                      >
+                        {q}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
           ) : (
             messages.map((msg, i) => <Message key={msg._id || i} msg={msg} />)
           )}
+
           {ask.isPending && (
             <div className="flex gap-3">
               <div className="h-8 w-8 rounded-full bg-muted flex items-center justify-center">
@@ -148,7 +188,12 @@ export default function ChatPage() {
             className="flex-1 h-11 rounded-xl border border-input bg-background px-4 text-sm
               placeholder:text-muted-foreground focus:outline-none focus:ring-2 ring-primary transition"
           />
-          <Button onClick={handleSend} disabled={!input.trim() || ask.isPending} size="icon" className="h-11 w-11 rounded-xl">
+          <Button
+            onClick={() => handleSend()}
+            disabled={!input.trim() || ask.isPending}
+            size="icon"
+            className="h-11 w-11 rounded-xl"
+          >
             <Send className="h-4 w-4" />
           </Button>
         </div>
