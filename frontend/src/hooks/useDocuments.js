@@ -7,6 +7,13 @@ export function useDocuments() {
         queryFn: async () => {
             const { data } = await api.get('/documents')
             return data.documents
+        },
+        refetchInterval: (query) => {
+            const docs = query.state.data
+            const hasProcessing = docs?.some(
+                d => d.status === 'pending' || d.status === 'processing'
+            )
+            return hasProcessing ? 3000 : false
         }
     })
 }
