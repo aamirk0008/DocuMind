@@ -58,6 +58,53 @@ export const getDocumentStatus = async (req, res) => {
     }
 }
 
+export const getSuggestedQuestions = async (req, res) => {
+    try {
+        const doc = await Document.findOne({
+            _id: new mongoose.Types.ObjectId(req.params.id),
+            userId: new mongoose.Types.ObjectId(req.userId),
+        })
+
+        if (!doc) return res.status(404).json({ message: 'Document not Found' })
+        if (doc.status !== 'ready') return res.status(400).json({ message: 'Document not ready yet.' })
+
+        // Get a few chunks to understand the document
+        const collection = mongoose.connection.db.collection('chunks')
+        const chunks = await collection.find({ 'metadata.documentId': req.params.id }).limit(3).toArray()
+
+        const context = chunks.map(c => c.pageContent).join('\n\n')
+
+        const { llm } = await import('../config/gemini.js')
+        const { HumanMessage } = await import('@langchain/core/messages')
+
+        const response = await llm.invoke([
+            new HumanMessage(`Based on this document content, generate exactly 5 short, specific questions a user might want to ask. Return ONLY a JSON array of strings, no explanation, no markdown, no backticks.
+
+Example format: ["Question 1?", "Question 2?", "Question 3?", "Question 4?", "Question 5?"]
+
+Document content:
+${context.substring(0, 3000)}`),
+        ])
+
+        let questions = []
+        try {
+            const text = response.content.trim()
+            questions = JSON.parse(text)
+        } catch {
+            // fallback parse — extract anything in quotes
+            const matches = response.content.match(/"([^"]+\?)"/g);
+            questions = matches
+                ? matches.map(m => m.replace(/"/g, '')).slice(0, 5)
+                : ['What is this document about?', 'What are the key points?', 'Summarize the main topics'];
+        }
+
+        res.json({ questions })
+    } catch (error) {
+        console.error('Suggested questions error:', error.message);
+        res.status(500).json({ message: error.message });
+    }
+}
+
 export const deleteDocument = async (req, res) => {
     try {
         const doc = await Document.findOneAndDelete({

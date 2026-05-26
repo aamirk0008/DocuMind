@@ -6,6 +6,7 @@ import {
   uploadDocument,
   getDocuments,
   getDocumentStatus,
+  getSuggestedQuestions,
   deleteDocument,
 } from '../controllers/document.controller.js';
 
@@ -16,6 +17,7 @@ router.use(protect);
 router.post('/upload', uploadLimiter, upload.single('file'), uploadDocument);
 router.get('/', getDocuments);
 router.get('/:id/status', getDocumentStatus);
+router.get('/:id/suggestions', getSuggestedQuestions);
 router.delete('/:id', deleteDocument);
 
 export default router;

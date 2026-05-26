@@ -18,6 +18,17 @@ export function useDocuments() {
     })
 }
 
+export function useSuggestedQuestions(documentId, enabled) {
+    return useQuery({
+        queryKey: ['suggestions', documentId],
+        queryFn: async () => {
+            const {data} = await api.get(`/documents/${documentId}/suggestions`)
+            return data.questions
+        },
+        enabled: !!documentId && enabled,
+        staleTime: Infinity, //never refetch - questions won't change and we don't want to refetch on window focus
+    })
+}
 
 export function useUploadDocument() {
     const qc = useQueryClient()
