@@ -28,7 +28,7 @@ export default function AuthPage() {
       } else {
         await register(form.name, form.email, form.password);
       }
-      navigate('/');
+      navigate('/dashboard');
     } catch (err) {
       setError(err.response?.data?.message || 'Something went wrong');
     } finally {
