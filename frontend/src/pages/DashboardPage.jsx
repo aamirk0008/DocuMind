@@ -5,6 +5,7 @@ import Navbar from '../components/layout/Navbar';
 import Button from '../components/ui/Button';
 import { Card } from '../components/ui/Card';
 import { useDocuments, useUploadDocument, useDeleteDocument } from '../hooks/useDocuments';
+import ConfirmModal from '../components/ui/ConfirmModal';
 
 const StatusBadge = ({ status }) => {
   const map = {
@@ -22,12 +23,31 @@ const StatusBadge = ({ status }) => {
   );
 };
 
+// Loading skeleton card
+const SkeletonCard = () => (
+  <div className="rounded-xl border border-border bg-card p-4 flex items-center justify-between gap-4 animate-pulse">
+    <div className="flex items-center gap-3">
+      <div className="h-10 w-10 rounded-lg bg-muted shrink-0" />
+      <div>
+        <div className="h-3.5 w-40 bg-muted rounded mb-2" />
+        <div className="h-3 w-24 bg-muted rounded" />
+      </div>
+    </div>
+    <div className="flex items-center gap-3">
+      <div className="h-6 w-16 bg-muted rounded-full" />
+      <div className="h-8 w-8 bg-muted rounded-md" />
+      <div className="h-8 w-8 bg-muted rounded-md" />
+    </div>
+  </div>
+);
+
 export default function DashboardPage() {
   const navigate = useNavigate();
   const { data: documents = [], isLoading } = useDocuments();
   const upload = useUploadDocument();
   const remove = useDeleteDocument();
   const [dragging, setDragging] = useState(false);
+  const [deleteTarget, setDeleteTarget] = useState(null);
 
   const handleFile = (file) => {
     if (!file || file.type !== 'application/pdf') return;
@@ -39,6 +59,16 @@ export default function DashboardPage() {
     setDragging(false);
     handleFile(e.dataTransfer.files[0]);
   }, []);
+
+  const handleDeleteClick = (doc) => {
+    setDeleteTarget({ id: doc._id, name: doc.originalName });
+  };
+
+  const handleDeleteConfirm = async () => {
+    if (!deleteTarget) return;
+    await remove.mutateAsync(deleteTarget.id);
+    setDeleteTarget(null);
+  };
 
   const formatSize = (bytes) => {
     if (bytes < 1024) return `${bytes} B`;
@@ -80,8 +110,10 @@ export default function DashboardPage() {
 
         {/* Document list */}
         {isLoading ? (
-          <div className="flex justify-center py-12">
-            <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+           <div className="flex flex-col gap-3">
+            <SkeletonCard />
+            <SkeletonCard />
+            <SkeletonCard />
           </div>
         ) : documents.length === 0 ? (
           <div className="text-center py-16">
@@ -113,13 +145,13 @@ export default function DashboardPage() {
                     disabled={doc.status !== 'ready'}
                     title="Chat with document"
                   >
-                    <MessageSquare className="h-4 w-4" />
+                    <MessageSquare className="h-4 w-4 cursor-pointer" />
                   </Button>
                   <Button
                     variant="ghost"
                     size="icon"
-                    onClick={() => remove.mutate(doc._id)}
-                    className="text-destructive hover:text-destructive"
+                    onClick={() => handleDeleteClick(doc)}
+                    className="text-destructive hover:text-destructive cursor-pointer"
                     title="Delete document"
                   >
                     <Trash2 className="h-4 w-4" />
@@ -130,6 +162,17 @@ export default function DashboardPage() {
           </div>
         )}
       </main>
+
+      {/* Delete confirmation modal */}
+      <ConfirmModal
+        isOpen={!!deleteTarget}
+        title="Delete document?"
+        message={`"${deleteTarget?.name}" and all its chat history will be permanently deleted. This cannot be undone.`}
+        onConfirm={handleDeleteConfirm}
+        onCancel={() => setDeleteTarget(null)}
+        loading={remove.isPending}
+      />
+
     </div>
   );
 }
