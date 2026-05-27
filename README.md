@@ -42,36 +42,46 @@ DocuMind is a production-grade RAG (Retrieval-Augmented Generation) system that 
 ---
 
 ## Architecture
+
+**Ingestion Pipeline**
+```
 User uploads PDF
-↓
+       ↓
 Express API → Multer (file validation)
-↓
+       ↓
 Document saved to MongoDB (status: pending)
-↓
+       ↓
 Job pushed to BullMQ queue
-↓
+       ↓
 Ingestion Worker picks up job
-↓
-pdfjs-dist → extract text
-↓
+       ↓
+pdfjs-dist → extract text from all pages
+       ↓
 RecursiveCharacterTextSplitter (1000 chars, 200 overlap)
-↓
+       ↓
 Gemini embedding-001 → 3072-dim vectors
-↓
+       ↓
 insertMany → MongoDB Atlas chunks collection
-↓
-Document status → ready
+       ↓
+Document status → ready ✓
+```
+
+**Query Pipeline**
+```
 User asks a question
-↓
+       ↓
 Embed question → Gemini embedding-001 (RETRIEVAL_QUERY)
-↓
+       ↓
 $vectorSearch aggregation → top 5 chunks (cosine similarity)
-↓
-Build context from chunks
-↓
+       ↓
+Filter by documentId → only chunks from this document
+       ↓
+Build context string from retrieved chunks
+       ↓
 Gemini 2.5 Flash → grounded answer with source citations
-↓
-Save to ChatSession → return to frontend
+       ↓
+Save to ChatSession → return to frontend ✓
+```
 
 ---
 
@@ -93,17 +103,18 @@ Save to ChatSession → return to frontend
 
 ## Project Structure
 
+```
 backend/
 ├── src/
 │   ├── config/
-│   │   ├── db.js              # MongoDB connection
-│   │   ├── redis.js           # Upstash Redis connection
-│   │   ├── gemini.js          # LangChain + Gemini init
-│   │   └── passport.js        # Google OAuth strategy
+│   │   ├── db.js               # MongoDB connection
+│   │   ├── redis.js            # Upstash Redis connection
+│   │   ├── gemini.js           # LangChain + Gemini init
+│   │   └── passport.js         # Google OAuth strategy
 │   ├── models/
-│   │   ├── User.js            # email, password, googleId, refreshTokens
-│   │   ├── Document.js        # metadata, status, chunkCount
-│   │   └── ChatSession.js     # messages[], sources[], documentId
+│   │   ├── User.js             # email, password, googleId, refreshTokens
+│   │   ├── Document.js         # metadata, status, chunkCount
+│   │   └── ChatSession.js      # messages[], sources[], documentId
 │   ├── routes/
 │   │   ├── auth.routes.js
 │   │   ├── document.routes.js
@@ -132,14 +143,15 @@ backend/
 │   │   └── chat.validator.js
 │   ├── app.js
 │   └── server.js
+
 frontend/
 ├── src/
 │   ├── pages/
-│   │   ├── HomePage.jsx       # Landing page
-│   │   ├── AuthPage.jsx       # Login + register + Google OAuth
-│   │   ├── DashboardPage.jsx  # Document library
-│   │   ├── ChatPage.jsx       # Chat interface
-│   │   └── OAuthCallback.jsx  # OAuth redirect handler
+│   │   ├── HomePage.jsx          # Landing page
+│   │   ├── AuthPage.jsx          # Login + register + Google OAuth
+│   │   ├── DashboardPage.jsx     # Document library
+│   │   ├── ChatPage.jsx          # Chat interface
+│   │   └── OAuthCallback.jsx     # OAuth redirect handler
 │   ├── components/
 │   │   ├── ui/
 │   │   │   ├── Button.jsx
@@ -151,11 +163,12 @@ frontend/
 │   │   ├── useDocuments.js
 │   │   └── useChat.js
 │   ├── store/
-│   │   ├── authStore.js       # Zustand auth state
-│   │   └── themeStore.js      # Zustand theme state
+│   │   ├── authStore.js          # Zustand auth state
+│   │   └── themeStore.js         # Zustand theme state
 │   └── lib/
-│       ├── api.js             # Axios instance + interceptors
-│       └── utils.js           # cn() utility
+│       ├── api.js                # Axios instance + interceptors
+│       └── utils.js              # cn() utility
+```
 
 ---
 
