@@ -1,24 +1,40 @@
-import { useState, useRef, useEffect } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
-import { ArrowLeft, Send, FileText, ChevronDown, ChevronUp, Loader2, Bot, User, Sparkles } from 'lucide-react';
-import ReactMarkdown from 'react-markdown';
-import Navbar from '../components/layout/Navbar';
-import Button from '../components/ui/Button';
-import { useChatHistory, useAskQuestion } from '../hooks/useChat';
-import { useSuggestedQuestions } from '../hooks/useDocuments';
+import { useState, useRef, useEffect } from "react";
+import { useParams, useNavigate } from "react-router-dom";
+import {
+  ArrowLeft,
+  Send,
+  FileText,
+  ChevronDown,
+  ChevronUp,
+  Loader2,
+  Bot,
+  User,
+  Sparkles,
+  Check,
+  Copy,
+} from "lucide-react";
+import ReactMarkdown from "react-markdown";
+import Navbar from "../components/layout/Navbar";
+import Button from "../components/ui/Button";
+import { useChatHistory, useAskQuestion } from "../hooks/useChat";
+import { useSuggestedQuestions } from "../hooks/useDocuments";
 
 const SourceCard = ({ source, index }) => {
   const [open, setOpen] = useState(false);
   return (
     <div className="border border-border rounded-lg overflow-hidden text-xs">
       <button
-        onClick={() => setOpen(o => !o)}
+        onClick={() => setOpen((o) => !o)}
         className="w-full flex items-center justify-between px-3 py-2 bg-muted/50 hover:bg-muted transition-colors text-left"
       >
         <span className="font-medium text-muted-foreground">
           Source {index + 1} · chunk #{source.chunkIndex} · score {source.score}
         </span>
-        {open ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />}
+        {open ? (
+          <ChevronUp className="h-3 w-3" />
+        ) : (
+          <ChevronDown className="h-3 w-3" />
+        )}
       </button>
       {open && (
         <p className="px-3 py-2 text-muted-foreground leading-relaxed font-mono">
@@ -29,25 +45,66 @@ const SourceCard = ({ source, index }) => {
   );
 };
 
-const Message = ({ msg }) => {
-  const isUser = msg.role === 'user';
+const CopyButton = ({ text }) => {
+  const [copied, setCopied] = useState(false);
+
+  const handleCopy = async () => {
+    await navigator.clipboard.writeText(text);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
   return (
-    <div className={`flex gap-3 ${isUser ? 'flex-row-reverse' : ''}`}>
-      <div className={`h-8 w-8 rounded-full flex items-center justify-center shrink-0
-        ${isUser ? 'bg-primary text-primary-foreground' : 'bg-muted text-muted-foreground'}`}>
+    <button
+      onClick={handleCopy}
+      className="opacity-0 group-hover:opacity-100 transition-opacity p-1.5 rounded-md hover:bg-accent text-muted-foreground hover:text-foreground"
+      title="Copy answer"
+    >
+      {copied ? (
+        <Check className="h-3.5 w-3.5 text-green-500" />
+      ) : (
+        <Copy className="h-3.5 w-3.5" />
+      )}{" "}
+    </button>
+  );
+};
+
+const Message = ({ msg }) => {
+  const isUser = msg.role === "user";
+  return (
+    <div className={`flex gap-3 group ${isUser ? "flex-row-reverse" : ""}`}>
+      <div
+        className={`h-8 w-8 rounded-full flex items-center justify-center shrink-0
+        ${isUser ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground"}`}
+      >
         {isUser ? <User className="h-4 w-4" /> : <Bot className="h-4 w-4" />}
       </div>
-      <div className={`max-w-[75%] flex flex-col gap-2 ${isUser ? 'items-end' : 'items-start'}`}>
-        <div className={`px-4 py-3 rounded-2xl text-sm leading-relaxed
-          ${isUser
-            ? 'bg-primary text-primary-foreground rounded-tr-sm'
-            : 'bg-card border border-border text-foreground rounded-tl-sm prose-custom'}`}>
+      <div
+        className={`max-w-[75%] flex flex-col gap-2 ${isUser ? "items-end" : "items-start"}`}
+      >
+        <div
+          className={`px-4 py-3 rounded-2xl text-sm leading-relaxed
+          ${
+            isUser
+              ? "bg-primary text-primary-foreground rounded-tr-sm"
+              : "bg-card border border-border text-foreground rounded-tl-sm prose-custom"
+          }`}
+        >
           {isUser ? msg.content : <ReactMarkdown>{msg.content}</ReactMarkdown>}
         </div>
+
+        {/* Copy button — only on AI messages */}
+        {!isUser && (
+          <div className="flex items-center gap-1 px-1">
+            <CopyButton text={msg.content} />
+          </div>
+        )}
+
         {msg.sources?.length > 0 && (
           <div className="w-full flex flex-col gap-1.5">
             <p className="text-xs text-muted-foreground px-1">Sources used:</p>
-            {msg.sources.map((s, i) => <SourceCard key={i} source={s} index={i} />)}
+            {msg.sources.map((s, i) => (
+              <SourceCard key={i} source={s} index={i} />
+            ))}
           </div>
         )}
       </div>
@@ -60,7 +117,7 @@ export default function ChatPage() {
   const navigate = useNavigate();
   const { data, isLoading } = useChatHistory(documentId);
   const ask = useAskQuestion(documentId);
-  const [input, setInput] = useState('');
+  const [input, setInput] = useState("");
   const [optimistic, setOptimistic] = useState([]);
   const bottomRef = useRef(null);
 
@@ -73,14 +130,14 @@ export default function ChatPage() {
   const messages = [...(data?.messages || []), ...optimistic];
 
   useEffect(() => {
-    bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
+    bottomRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
 
   const handleSend = async (question) => {
     const q = question || input.trim();
     if (!q || ask.isPending) return;
-    setInput('');
-    setOptimistic([{ role: 'user', content: q, _id: 'opt' }]);
+    setInput("");
+    setOptimistic([{ role: "user", content: q, _id: "opt" }]);
 
     try {
       await ask.mutateAsync(q);
@@ -96,7 +153,12 @@ export default function ChatPage() {
 
       {/* Chat header */}
       <div className="border-b border-border bg-card px-4 py-3 flex items-center gap-3">
-        <Button variant="ghost" size="icon" onClick={() => navigate('/dashboard')} aria-label="Back to dashboard">
+        <Button
+          variant="ghost"
+          size="icon"
+          onClick={() => navigate("/dashboard")}
+          aria-label="Back to dashboard"
+        >
           <ArrowLeft className="h-4 w-4" />
         </Button>
         <div className="h-8 w-8 rounded-lg bg-primary/10 flex items-center justify-center">
@@ -104,9 +166,11 @@ export default function ChatPage() {
         </div>
         <div>
           <p className="text-sm font-medium text-foreground">
-            {data?.documentName || 'Loading...'}
+            {data?.documentName || "Loading..."}
           </p>
-          <p className="text-xs text-muted-foreground">Ask anything about this document</p>
+          <p className="text-xs text-muted-foreground">
+            Ask anything about this document
+          </p>
         </div>
       </div>
 
@@ -121,7 +185,9 @@ export default function ChatPage() {
             <div className="flex flex-col items-center py-10 gap-6">
               <div className="text-center">
                 <Bot className="h-12 w-12 mx-auto text-muted-foreground mb-3" />
-                <p className="font-medium text-foreground">Start a conversation</p>
+                <p className="font-medium text-foreground">
+                  Start a conversation
+                </p>
                 <p className="text-sm text-muted-foreground mt-1">
                   Ask anything about your document
                 </p>
@@ -133,26 +199,28 @@ export default function ChatPage() {
                   <Sparkles className="h-4 w-4 animate-pulse text-primary" />
                   Generating suggested questions...
                 </div>
-              ) : suggestions.length > 0 && (
-                <div className="w-full max-w-xl">
-                  <div className="flex items-center gap-2 mb-3">
-                    <Sparkles className="h-4 w-4 text-primary" />
-                    <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
-                      Suggested questions
-                    </p>
+              ) : (
+                suggestions.length > 0 && (
+                  <div className="w-full max-w-xl">
+                    <div className="flex items-center gap-2 mb-3">
+                      <Sparkles className="h-4 w-4 text-primary" />
+                      <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
+                        Suggested questions
+                      </p>
+                    </div>
+                    <div className="flex flex-col gap-2">
+                      {suggestions.map((q, i) => (
+                        <button
+                          key={i}
+                          onClick={() => handleSend(q)}
+                          className="text-left px-4 py-3 rounded-xl border border-border bg-card hover:bg-accent hover:border-primary/30 transition-all text-sm text-foreground"
+                        >
+                          {q}
+                        </button>
+                      ))}
+                    </div>
                   </div>
-                  <div className="flex flex-col gap-2">
-                    {suggestions.map((q, i) => (
-                      <button
-                        key={i}
-                        onClick={() => handleSend(q)}
-                        className="text-left px-4 py-3 rounded-xl border border-border bg-card hover:bg-accent hover:border-primary/30 transition-all text-sm text-foreground"
-                      >
-                        {q}
-                      </button>
-                    ))}
-                  </div>
-                </div>
+                )
               )}
             </div>
           ) : (
@@ -166,9 +234,18 @@ export default function ChatPage() {
               </div>
               <div className="bg-card border border-border rounded-2xl rounded-tl-sm px-4 py-3">
                 <div className="flex gap-1">
-                  <span className="h-2 w-2 rounded-full bg-muted-foreground animate-bounce" style={{ animationDelay: '0ms' }} />
-                  <span className="h-2 w-2 rounded-full bg-muted-foreground animate-bounce" style={{ animationDelay: '150ms' }} />
-                  <span className="h-2 w-2 rounded-full bg-muted-foreground animate-bounce" style={{ animationDelay: '300ms' }} />
+                  <span
+                    className="h-2 w-2 rounded-full bg-muted-foreground animate-bounce"
+                    style={{ animationDelay: "0ms" }}
+                  />
+                  <span
+                    className="h-2 w-2 rounded-full bg-muted-foreground animate-bounce"
+                    style={{ animationDelay: "150ms" }}
+                  />
+                  <span
+                    className="h-2 w-2 rounded-full bg-muted-foreground animate-bounce"
+                    style={{ animationDelay: "300ms" }}
+                  />
                 </div>
               </div>
             </div>
@@ -182,8 +259,13 @@ export default function ChatPage() {
         <div className="max-w-3xl mx-auto flex gap-3">
           <input
             value={input}
-            onChange={e => setInput(e.target.value)}
-            onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSend(); } }}
+            onChange={(e) => setInput(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter" && !e.shiftKey) {
+                e.preventDefault();
+                handleSend();
+              }
+            }}
             placeholder="Ask a question about your document..."
             className="flex-1 h-11 rounded-xl border border-input bg-background px-4 text-sm
               placeholder:text-muted-foreground focus:outline-none focus:ring-2 ring-primary transition"
