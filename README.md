@@ -286,20 +286,77 @@ Name the index `vector_index`.
 
 ## Key Technical Decisions
 
-**Why RAG over fine-tuning?**
-RAG is faster to deploy, cheaper to run, and more accurate for document-specific queries. Fine-tuning requires retraining for every new document — RAG works with any document instantly.
+## Key Technical Decisions
 
-**Why BullMQ for ingestion?**
-Processing large PDFs synchronously would block the HTTP request. BullMQ moves ingestion to a background worker with retry logic, so users get an immediate response and the document processes asynchronously.
+### 1. RAG over Fine-tuning
+**Why:** Fine-tuning requires retraining the model for every new document, which is expensive, slow, and impractical for a multi-user system where every user uploads different documents. RAG retrieves relevant context at query time and passes it to the model — no retraining needed, works with any document instantly, and the knowledge is always up to date.
 
-**Why MongoDB Atlas Vector Search over Pinecone?**
-Keeps the stack unified — one database for documents, chat history, and vector embeddings. Reduces infrastructure complexity and cost for a project at this scale.
+**Trade-off:** RAG quality depends heavily on chunking strategy and embedding quality. If chunks are too large, irrelevant context pollutes the answer. If too small, answers lack enough context. We use 1000-char chunks with 200-char overlap — overlap ensures sentences cut at chunk boundaries don't lose meaning.
 
-**Why Gemini embedding-001 over text-embedding-004?**
-text-embedding-004 wasn't available on the API key tier used. gemini-embedding-001 produces 3072-dim vectors with strong semantic understanding for document retrieval tasks.
+**Alternative:** Fine-tuning would make sense for a domain-specific assistant (e.g. a legal AI trained on thousands of contracts) where the knowledge is static and shared across all users.
 
-**Why dual-token JWT?**
-Short-lived access tokens (15min) limit exposure if stolen. Refresh tokens rotate on every use — reuse detection invalidates all sessions if a token is replayed, preventing token theft attacks.
+---
+
+### 2. MongoDB Atlas Vector Search over Pinecone / Qdrant
+**Why:** Keeps the entire stack on one database — documents, chat history, user data, and vector embeddings all live in MongoDB. This eliminates a separate vector database service, reduces infrastructure cost, and simplifies deployment. MongoDB Atlas free tier supports vector search, making it ideal for a portfolio project.
+
+**Trade-off:** Dedicated vector databases like Pinecone or Qdrant offer more advanced ANN indexing algorithms (HNSW) and better performance at very large scale (millions of vectors). MongoDB Atlas Vector Search uses a flat index which is slightly slower at extreme scale.
+
+**Alternative:** Pinecone would be the right choice if the system needed to handle tens of millions of vectors across thousands of users with sub-10ms query latency.
+
+---
+
+### 3. BullMQ + Redis for Async Ingestion
+**Why:** Processing a large PDF synchronously inside an HTTP request would block the server for 10-30 seconds — unacceptable UX and a timeout risk. BullMQ moves ingestion to a background worker: the API responds immediately with `status: pending`, and the worker processes the PDF asynchronously. 3x retry with exponential backoff handles transient failures (Gemini API timeouts, MongoDB write failures) without user intervention.
+
+**Trade-off:** Adds Redis as an infrastructure dependency. For a simple single-user app, in-process queuing (like a simple async function) would work. BullMQ is the right choice when you need persistence (jobs survive server restarts), retry logic, and concurrency control.
+
+**Alternative:** Without Redis, you could use a simple in-memory queue or process PDFs synchronously with a longer timeout. For serverless deployments, a message queue like AWS SQS or Google Pub/Sub would replace BullMQ entirely.
+
+---
+
+### 4. JWT Dual-Token Auth with Refresh Rotation
+**Why:** A single long-lived JWT is a security risk — if stolen, an attacker has access until expiry. Dual-token solves this: short-lived access tokens (15 min) limit the damage window, while refresh tokens rotate on every use. Reuse detection invalidates all sessions if a refresh token is replayed — this catches token theft attacks where an attacker steals and uses a refresh token before the legitimate user does.
+
+**Trade-off:** More complexity than a single token. Requires storing refresh tokens in the database for reuse detection, adding a DB read on every refresh. Stateless JWTs lose their stateless advantage when you start persisting them.
+
+**Alternative:** Session-based auth (server-side sessions with Redis) is simpler and easier to invalidate. OAuth-only (no email/password) would eliminate token management entirely but reduces flexibility.
+
+---
+
+### 5. Gemini embedding-001 over text-embedding-004
+**Why:** `text-embedding-004` wasn't available on the API key tier used during development. `gemini-embedding-001` produces 3072-dimensional vectors with strong semantic understanding for retrieval tasks. The higher dimensionality (vs the typical 768 or 1536 of other models) captures more semantic nuance.
+
+**Trade-off:** 3072-dim vectors use more storage and make vector search slightly slower than lower-dimensional alternatives. Each chunk document in MongoDB is larger.
+
+**Alternative:** OpenAI's `text-embedding-3-large` (3072-dim) or `text-embedding-3-small` (1536-dim) are strong alternatives with wider ecosystem support. If cost is a concern, `text-embedding-3-small` offers a good balance of quality and size.
+
+---
+
+### 6. RecursiveCharacterTextSplitter (1000 chars, 200 overlap)
+**Why:** PDFs contain varied content — paragraphs, bullet points, tables, headers. `RecursiveCharacterTextSplitter` tries to split on natural boundaries (paragraphs → sentences → words) before falling back to character splits. This preserves semantic coherence better than fixed-size splitting. 1000-char chunks fit comfortably within Gemini's embedding input limit (2048 tokens for embedding-001) while being large enough to contain meaningful context.
+
+**Trade-off:** Overlapping chunks (200 chars) increase storage by ~20% but prevent answers from being cut off at chunk boundaries. A sentence that starts at character 900 of one chunk and ends at character 50 of the next will be captured in both.
+
+**Alternative:** Semantic chunking (splitting on embedding similarity drops rather than character count) produces more coherent chunks but is significantly slower and more expensive at ingestion time.
+
+---
+
+### 7. Zustand for Client State + React Query for Server State
+**Why:** Separating concerns — React Query handles all async server state (documents list, chat history, document status polling) with built-in caching, background refetching, and optimistic updates. Zustand handles the tiny slice of pure client state (logged-in user, theme preference) that doesn't need React Query's complexity. Together they eliminate the need for Redux entirely.
+
+**Trade-off:** Two state management libraries instead of one. However, they serve genuinely different purposes — mixing them into one Redux store would add unnecessary boilerplate for what is essentially a 3-field client state.
+
+**Alternative:** Redux Toolkit with RTK Query handles both server and client state in one library. Better for large teams with complex interconnected state. Over-engineered for this project's scope.
+
+---
+
+### 8. Separate Frontend and Backend Deployment
+**Why:** Deploying frontend (Vercel) and backend (Render) separately allows independent scaling, independent deployment pipelines, and lets each platform optimize for its workload. Vercel's edge network serves the React app from CDN nodes closest to the user. Render runs the Node.js server with persistent connections to MongoDB and Redis.
+
+**Trade-off:** Cross-origin requests require careful CORS configuration. Cookies require `SameSite: none; Secure` in production. A monorepo deployment on a single platform (Railway, Fly.io) would eliminate these issues.
+
+**Alternative:** A monolith deployment on Railway or Fly.io would simplify CORS and cookie handling. Next.js full-stack would eliminate the separate backend entirely for simpler use cases.
 
 ---
 
